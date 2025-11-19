@@ -1,9 +1,8 @@
 import numpy as np
 
-from BTInvert import (
+from BTSensorInfo import (
     SensorInfo, Measurement, TxRxLoop
 )
-
 
 class CustomSensorInfo(SensorInfo):
 
