@@ -103,6 +103,9 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+# Exclude dev codes
+dev/*
+
 # data
 data-blacktusk/*
 ordnance_DoD_UltraTEM_5F_ISOsmall/*
