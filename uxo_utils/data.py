@@ -4,12 +4,12 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 import warnings
 
-from .imports import data_dir
+from .imports import data_dir, main_data_dir, DoD_ordnance_dir, sensor_def_dir
 from BTInvert import SensorInfo
 from .parse import proc_group
 
 def load_ordnance_dict(
-    directory=data_dir,
+    directory=DoD_ordnance_dir,
     filenames=[
         "ordnance_DoD_UltraTEM_5F_APG.h5",
         "ordnance_DoD_UltraTEM_5F_ISOsmall.h5",
@@ -22,7 +22,7 @@ def load_ordnance_dict(
     ord_dict = {}
 
     for file in filenames:
-        ord_file = os.path.join(data_dir, file)
+        ord_file = os.path.join(directory, file)
         f = h5py.File(ord_file, 'r')
         for i in f['ordnance']:
             ord_name = str(f[f'ordnance/{i}/Name'][()][0]).split("'")[1]
@@ -57,27 +57,38 @@ def load_ordnance_dict(
 
 
 def load_sensor_info(sensor="UltraTEM"):
+    """
+    Load sensor information from YAML definition files.
+    In new data structure, these are located in
+        'ww_selected_data_2025/sensor_definitions'.
+    Update this path in uxo_utils/imports.py if necessary.
+    """
 
     if sensor.lower() == "ultratem":
         filename = os.path.join(
-            data_dir, 'config', 'sensor_definitions', 'UltraTEMArrayNA___Default.yaml'
+            sensor_def_dir, 'UltraTEMArrayNA___Default.yaml'
         )
     elif "subtem" in sensor.lower():
         if "rov" in sensor.lower():
             filename = os.path.join(
-                data_dir, 'config', 'sensor_definitions', 'SubTEM_ROV___Default.yaml'
+                sensor_def_dir, 'SubTEM_ROV___Default.yaml'
             )
         else:
             filename = os.path.join(
-                data_dir, 'config', 'sensor_definitions', 'SubTEMSledge___Default.yaml'
+                sensor_def_dir, 'SubTEMSledge___Default.yaml'
             )
     elif sensor.lower() == "ultratema":
         filename = os.path.join(
-            data_dir, 'config', 'sensor_definitions', 'UltraTEMA___Default.yaml'
+            sensor_def_dir, 'UltraTEMA___Default.yaml'
         )
 
-
-    return SensorInfo.fromYAML(filename)[0]
+    sensorinfo = SensorInfo.fromYAML(filename)[0]
+    if sensor.lower() == 'ultratem':
+        vertical_sensor_x_coord = sensorinfo.transmitters[4].shape[:, 0]
+        sensorinfo.width_x = np.r_[min(vertical_sensor_x_coord), max(vertical_sensor_x_coord)]  # meters
+    else:
+        raise warnings.warn('Sensor width not set for this sensor type.')
+    return sensorinfo
 
 
 def load_h5_data(filepath):
