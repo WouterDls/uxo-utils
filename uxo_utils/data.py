@@ -119,7 +119,10 @@ def create_survey_from_file(filepath, convert_degrees_to_radians=False):
     times = np.array(dic['SensorTimes'].flatten())
 
     def get_index(key):
-        return xyz_dict["Info"][key]["ChannelIndex"].flatten().astype(int)-1
+        if key in xyz_dict["Info"].keys():
+            return xyz_dict["Info"][key]["ChannelIndex"].flatten().astype(int)-1
+        else:
+            return np.where(np.array(xyz_dict['Info']['ChannelNames']) == str(key))[0] # no -1 needed, as pythonic approach
 
     def get_values(key):
         index = get_index(key)
@@ -145,11 +148,30 @@ def create_survey_from_file(filepath, convert_degrees_to_radians=False):
     rx_num = get_values("RxNum").astype(int) - 1
     tx_num = get_values("TxNum").astype(int) - 1
     rx_comp = get_values("RxCNum").astype(int) - 1
-    data = xyz_data[get_index("Data"), :].T
-    return Survey(times, easting, northing, pitch, roll, yaw, mnum, data, line, rx_num, tx_num, rx_comp)
+    data = xyz_data[get_index("Data"), :].T # Filtered data
+    # Extension w.r.t. 2021-uxo-utils
+    if 'tearly_filterdist' in xyz_dict['Info']['ChannelNames']:
+        tearly = get_values("tearly")
+        tearly_filterdist = get_values("tearly_filterdist")
+        tmid = get_values("tmid")
+        tmid_filterdist = get_values("tmid_filterdist")
+        tlate = get_values("tlate")
+        tlate_filterdist = get_values("tlate_filterdist")
+        elevation = get_values("Elevation")
+        # Extracting raw data (unfiltered). It assumes that the indices are "logically"-ordered between the early and late times.
+        idx0 = np.where(np.array(xyz_dict['Info']['ChannelNames']) == str("t154"))[0]
+        idxn = np.where(np.array(xyz_dict['Info']['ChannelNames']) == str("t2420"))[0]
+        raw_data = xyz_data[idx0:idxn+1, :].T
+        return Survey_from_h5(times, easting, northing, pitch, roll, yaw, mnum, data, line, rx_num, tx_num, rx_comp,
+                              tearly, tearly_filterdist, tmid, tmid_filterdist, tlate, tlate_filterdist, elevation, raw_data)
+    else:
+        return Survey(times, easting, northing, pitch, roll, yaw, mnum, data, line, rx_num, tx_num, rx_comp)
 
 
 class Survey:
+    """
+    Minimal class to hold survey information and derived properties.
+    """
     def __init__(
         self,
         times,
@@ -182,6 +204,9 @@ class Survey:
     # Properties directly from data file
     @property
     def times(self):
+        """
+        Time values for each time channel.
+        """
         return self._times
 
     @property
@@ -206,22 +231,37 @@ class Survey:
 
     @property
     def mnum(self):
+        """
+        Measurement number for each measurement. It corresponds to a unique receiver-transmitter (incl. orientation) pair.
+        """
         return self._mnum
 
     @property
     def line(self):
+        """
+        Line number for EACH measurement. Length matches number of measurements.
+        """
         return self._line
 
     @property
     def rx_num(self):
+        """
+        Receiver number. Length matches number of measurements.
+        """
         return self._rx_num
 
     @property
     def tx_num(self):
+        """
+        Transmitter number. Length matches number of measurements.
+        """
         return self._tx_num
 
     @property
     def data(self):
+        """
+        FILTERED dB/dt data. Shape is (number of measurements, number of time channels).
+        """
         return self._data
 
     # Derived properties
@@ -244,6 +284,9 @@ class Survey:
         return self._local_y
 
     def _rotate_survey(self):
+        """
+        Rotate survey coordinates to align with survey direction.
+        """
         theta, slope, rotated_x, rotated_y = rotate_survey(self.local_x, self.local_y)
         self._theta = theta
         self._slope = slope
@@ -277,6 +320,81 @@ class Survey:
 
     @property
     def unique_lines(self):
+        """
+        Unique line numbers in the survey.
+        """
         if getattr(self, "_unique_lines", None) is None:
             self._unique_lines = np.unique(self.line)
         return self._unique_lines
+
+
+class Survey_from_h5(Survey):
+    def __init__(self,
+                times,
+                easting,
+                northing,
+                pitch,
+                roll,
+                yaw,
+                mnum,
+                data,
+                line,
+                rx_num,
+                tx_num,
+                rx_comp,
+                tearly=None,
+                tearly_filterdist=None,
+                tmid=None,
+                tmid_filterdist=None,
+                tlate=None,
+                tlate_filterdist=None,
+                elevation=None,
+                raw_data=None):
+
+        super().__init__(times, easting, northing, pitch, roll, yaw, mnum, data, line, rx_num, tx_num, rx_comp)
+        self._tearly = tearly
+        self._tearly_filterdist = tearly_filterdist
+        self._tmid = tmid
+        self._tmid_filterdist = tmid_filterdist
+        self._tlate = tlate
+        self._tlate_filterdist = tlate_filterdist
+        self._elevation = elevation
+
+    @property
+    def tearly(self):
+        return self._tearly
+
+    @property
+    def tearly_filterdist(self):
+        return self._tearly_filterdist
+
+    @property
+    def tmid(self):
+        return self._tmid
+
+    @property
+    def tmid_filterdist(self):
+        return self._tmid_filterdist
+
+    @property
+    def tlate(self):
+        return self._tlate
+
+    @property
+    def tlate_filterdist(self):
+        return self._tlate_filterdist
+
+    @property
+    def elevation(self):
+        return self._elevation
+
+    @property
+    def raw_data(self):
+        """
+        RAW (i.e. UNFILTERED) dB/dt data. Shape is (number of measurements, number of time channels).
+        """
+        return self._raw_data
+
+
+    
+
