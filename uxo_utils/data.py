@@ -159,8 +159,8 @@ def create_survey_from_file(filepath, convert_degrees_to_radians=False):
         tlate_filterdist = get_values("tlate_filterdist")
         elevation = get_values("Elevation")
         # Extracting raw data (unfiltered). It assumes that the indices are "logically"-ordered between the early and late times.
-        idx0 = np.where(np.array(xyz_dict['Info']['ChannelNames']) == str("t154"))[0]
-        idxn = np.where(np.array(xyz_dict['Info']['ChannelNames']) == str("t2420"))[0]
+        idx0 = int(np.where(np.array(xyz_dict['Info']['ChannelNames']) == str("t154"))[0])
+        idxn = int(np.where(np.array(xyz_dict['Info']['ChannelNames']) == str("t2420"))[0])
         raw_data = xyz_data[idx0:idxn+1, :].T
         return Survey_from_h5(times, easting, northing, pitch, roll, yaw, mnum, data, line, rx_num, tx_num, rx_comp,
                               tearly, tearly_filterdist, tmid, tmid_filterdist, tlate, tlate_filterdist, elevation, raw_data)
