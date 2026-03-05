@@ -122,7 +122,13 @@ def create_survey_from_file(filepath, convert_degrees_to_radians=False):
         if key in xyz_dict["Info"].keys():
             return xyz_dict["Info"][key]["ChannelIndex"].flatten().astype(int)-1
         else:
-            return np.where(np.array(xyz_dict['Info']['ChannelNames']) == str(key))[0] # no -1 needed, as pythonic approach
+            if type(dic['XYZ']['Info']['ChannelNames']) == str:
+                text = dic['XYZ']['Info']['ChannelNames']
+                l = np.array([item.strip() for item in text.split(",")])
+            else:
+                l = dic['XYZ']['Info']['ChannelNames']
+            # Text appears as long string with comma-separated values. We need to split and strip it to get the individual channel names.
+            return np.where(l == str(key))[0] # no -1 needed, as pythonic approach
 
     def get_values(key):
         index = get_index(key)
@@ -159,9 +165,26 @@ def create_survey_from_file(filepath, convert_degrees_to_radians=False):
         tlate_filterdist = get_values("tlate_filterdist")
         elevation = get_values("Elevation")
         # Extracting raw data (unfiltered). It assumes that the indices are "logically"-ordered between the early and late times.
-        idx0 = int(np.where(np.array(xyz_dict['Info']['ChannelNames']) == str("t154"))[0])
-        idxn = int(np.where(np.array(xyz_dict['Info']['ChannelNames']) == str("t2420"))[0])
-        raw_data = xyz_data[idx0:idxn+1, :].T
+        if type(dic['XYZ']['Info']['ChannelNames']) == str:
+            text = dic['XYZ']['Info']['ChannelNames']
+            ChannelNames = np.array([item.strip() for item in text.split(",")])
+        else:
+            ChannelNames = dic['XYZ']['Info']['ChannelNames']
+        if times.size == 27:
+            idx0 = np.where(ChannelNames== str('t154'))[0]
+            idxn = np.where(ChannelNames == str('t2420'))[0]
+
+        elif times.size == 25:
+            idx0 = np.where(ChannelNames== str('t190'))[0][0]
+            idxn = np.where(ChannelNames == str('t2420'))[0][0]
+
+        else:
+            raise ValueError("Unexpected number of time channels. Cannot determine index for raw data.")
+        try:
+            raw_data = xyz_data[idx0:idxn+1, :].T
+        except:
+            raw_data = None
+            warnings.warn("Could not extract raw data. Check channel names and indices.")
         return Survey_from_h5(times, easting, northing, pitch, roll, yaw, mnum, data, line, rx_num, tx_num, rx_comp,
                               tearly, tearly_filterdist, tmid, tmid_filterdist, tlate, tlate_filterdist, elevation, raw_data)
     else:
@@ -359,6 +382,7 @@ class Survey_from_h5(Survey):
         self._tlate = tlate
         self._tlate_filterdist = tlate_filterdist
         self._elevation = elevation
+        self._raw_data = raw_data
 
     @property
     def tearly(self):
