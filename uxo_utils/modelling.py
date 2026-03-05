@@ -92,9 +92,7 @@ def create_survey(
 
 
 
-def create_forward_modelling_params(
-    sensorinfo, times, mnum, pos, pitch, roll, yaw
-):
+def create_forward_modelling_params(sensorinfo, times, mnum, pos, pitch, roll, yaw):
     Tx_indices_rot, Rx_indices_rot = preCalcLoopCorners(
         sensorinfo=sensorinfo, mnum=mnum, rlist=pos,
         pitch=pitch, roll=roll, yaw=yaw
@@ -113,13 +111,29 @@ def generate_random_variables(n, bounds, log_scaled=False):
 def noise_model(times, amplitude=0.1, slope=-1):
     return amplitude * np.exp(slope * np.log(times))
 
+def create_target(L1, L2, L3, xyz, ypr, times):
+    """
+    Create a BTInvert Model object representing a dipole with given properties.
+    """
+    target = Model(xyz=np.r_[xyz],  # [x,y,z] of target/dipole
+                gba=np.r_[ypr],  # [yaw, pitch, roll] of target/dipole
+                l3=L3,  # Polarization L3 in terms of time
+                l2=L2,
+                l1=L1,
+                times=times)
+    return target
+
+def generate_target_response(target, sensor):
+    # run simulation
+    return forwardWithQ(target, sensor) # nT/s (some version of db/dt)
+
 def simulate_object(L1, L2, L3, st, times, xyz, ypr):
     # run simulation
-    mod = Model(xyz=xyz, gba=ypr, l3=L3, l2=L2, l1=L1, times=times)
-    V = forwardWithQ(mod, st) # nT/s (some version of db/dt)
+    target = create_target(L1, L2, L3, xyz, ypr, times)
+    V = generate_target_response(target, st)
+
     V = V.reshape(-1, st.mnum.max()+1, len(times))
     V = np.swapaxes(V, 0, 1)
-
     return V
 
 
